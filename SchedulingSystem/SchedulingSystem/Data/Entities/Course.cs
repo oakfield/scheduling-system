@@ -20,19 +20,18 @@ public class Course
 
     public required string Department { get; set; }
 
-    /// <summary>Total seats available in the section. Not present in source data;
-    /// synthesized during seeding.</summary>
+    /// <summary>Total seats available in the section.</summary>
     public int Capacity { get; set; }
 
-    /// <summary>Courses that must be completed (or assigned this semester) before this
+    /// <summary>Courses that must be completed or assigned this semester before this
     /// course may be taken.</summary>
-    public ICollection<Course> Prerequisites { get; set; } = new List<Course>();
+    public ICollection<Course> Prerequisites { get; set; } = [];
 
     /// <summary>Inverse of <see cref="Prerequisites"/>: courses that list this course as
     /// a prerequisite.</summary>
-    public ICollection<Course> UnlocksCourses { get; set; } = new List<Course>();
+    public ICollection<Course> UnlocksCourses { get; set; } = [];
 
-    public ICollection<Student> CompletedByStudents { get; set; } = new List<Student>();
+    public ICollection<Student> CompletedByStudents { get; set; } = [];
 
-    public ICollection<Student> AssignedStudents { get; set; } = new List<Student>();
+    public ICollection<Student> AssignedStudents { get; set; } = [];
 }

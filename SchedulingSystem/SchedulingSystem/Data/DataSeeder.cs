@@ -93,7 +93,7 @@ public static class DataSeeder
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static IEnumerable<string> SplitList(string? value) =>
+    private static string[] SplitList(string? value) =>
         string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -102,7 +102,7 @@ public static class DataSeeder
     {
         using var reader = new StreamReader(path);
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-        return csv.GetRecords<T>().ToList();
+        return [.. csv.GetRecords<T>()];
     }
 
     private sealed class StudentCsvRow

@@ -13,14 +13,14 @@ public class Student
 
     public required string Email { get; set; }
 
-    /// <summary>House / college affiliation. Purely informational.</summary>
+    /// <summary>House / college affiliation.</summary>
     public required string HouseAffiliation { get; set; }
 
     public int YearLevel { get; set; }
 
     /// <summary>
     /// Credits the student is carrying in their current, already-in-progress term.
-    /// Display-only: this is separate from the upcoming semester being scheduled by
+    /// This is separate from the upcoming semester being scheduled by
     /// this app and does not count toward <see cref="MaxCreditsAllowed"/>.
     /// </summary>
     public int CurrentCredits { get; set; }
@@ -29,16 +29,15 @@ public class Student
     public int MaxCreditsAllowed { get; set; }
 
     /// <summary>
-    /// Courses this student has already completed (satisfies prerequisites, does not
-    /// count toward the upcoming semester's credit load).
+    /// Courses this student has already completed.
     /// </summary>
-    public ICollection<Course> CompletedCourses { get; set; } = new List<Course>();
+    public ICollection<Course> CompletedCourses { get; set; } = [];
 
     /// <summary>
     /// Courses this student has been assigned to for the upcoming semester. These also
     /// satisfy prerequisites for other courses assigned in the same semester.
     /// </summary>
-    public ICollection<Course> AssignedCourses { get; set; } = new List<Course>();
+    public ICollection<Course> AssignedCourses { get; set; } = [];
 
-    public string FullName => $"{FirstName} {LastName}";
+    public string FullName => $"{FirstName} {LastName}".Trim();
 }
