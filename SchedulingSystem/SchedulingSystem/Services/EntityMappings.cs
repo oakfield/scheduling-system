@@ -21,7 +21,8 @@ internal static class EntityMappings
         s.YearLevel,
         s.CurrentCredits,
         s.MaxCreditsAllowed,
-        s.CompletedCourses.Select(c => c.CourseNumber).OrderBy(c => c).ToList());
+        s.CompletedCourses.Select(c => c.CourseNumber).OrderBy(c => c).ToList(),
+        s.AssignedCourses.Select(c => c.CourseNumber).OrderBy(c => c).ToList());
 
     public static StudentAssignmentProfile ToAssignmentProfile(Student s) => new(
         s.Id,

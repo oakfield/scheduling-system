@@ -26,6 +26,7 @@ else
                     <th>Current Credits</th>
                     <th>Max Credits</th>
                     <th>Completed Courses</th>
+                    <th>Assigned Courses</th>
                 </tr>
                 <tr>
                     <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="nameFilter" @bind:event="oninput" /></th>
@@ -34,6 +35,7 @@ else
                     <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="yearFilter" @bind:event="oninput" /></th>
                     <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="currentCreditsFilter" @bind:event="oninput" /></th>
                     <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="maxCreditsFilter" @bind:event="oninput" /></th>
+                    <th></th>
                     <th></th>
                 </tr>
             </thead>
@@ -55,6 +57,16 @@ else
                             else
                             {
                                 @string.Join(", ", student.CompletedCourseNumbers)
+                            }
+                        </td>
+                        <td>
+                            @if (student.AssignedCourseNumbers.Count == 0)
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                            else
+                            {
+                                @string.Join(", ", student.AssignedCourseNumbers)
                             }
                         </td>
                     </tr>

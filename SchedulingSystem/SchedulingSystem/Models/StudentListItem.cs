@@ -13,7 +13,8 @@ public record StudentListItem(
     int YearLevel,
     int CurrentCredits,
     int MaxCreditsAllowed,
-    IReadOnlyList<string> CompletedCourseNumbers)
+    IReadOnlyList<string> CompletedCourseNumbers,
+    IReadOnlyList<string> AssignedCourseNumbers)
 {
     public string FullName => $"{FirstName} {LastName}";
 }

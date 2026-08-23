@@ -13,6 +13,7 @@ public class StudentService(IDbContextFactory<SchedulingDbContext> contextFactor
         var students = await db.Students
             .AsNoTracking()
             .Include(s => s.CompletedCourses)
+            .Include(s => s.AssignedCourses)
             .OrderBy(s => s.LastName)
             .ThenBy(s => s.FirstName)
             .ToListAsync(cancellationToken);
