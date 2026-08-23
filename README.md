@@ -21,7 +21,13 @@ cd SchedulingSystem/SchedulingSystem
 dotnet run
 ```
 
-`appsettings.json` points at Postgres on `localhost:5432` for this scenario. The
-containerized app instead gets its connection string from an environment variable in
-`docker-compose.yml` (pointing at the `postgres` service by container name), so no code
-change is needed to move between the two.
+`appsettings.json` points at Postgres on `localhost:5433` for this scenario (mapped from
+the container's standard 5432 — deliberately not 5432 on the host, in case a machine
+already has its own local Postgres bound there; see the comment in `docker-compose.yml`).
+The containerized app instead gets its connection string from an environment variable in
+`docker-compose.yml` (pointing at the `postgres` service by container name on its
+internal 5432), so no code change is needed to move between the two.
+
+If `dotnet run` fails with a Postgres password/auth error, it's almost always this: the
+Docker Postgres container isn't running (`docker compose up postgres -d` first), or
+something else on this machine is answering on the port `appsettings.json` points at.

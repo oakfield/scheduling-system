@@ -7,7 +7,12 @@ services:
       - POSTGRES_USER=scheduling_app
       - POSTGRES_PASSWORD=scheduling_dev_password
     ports:
-      - "5432:5432"
+      # Host port 5433, not 5432: a machine with a native/other local Postgres already
+      # bound to 5432 would otherwise silently take precedence over this container for
+      # host-side connections (e.g. a local `dotnet run`), which fails auth against the
+      # wrong server. Container-to-container traffic (the app service, below) is
+      # unaffected either way since it addresses this service by name on port 5432.
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
