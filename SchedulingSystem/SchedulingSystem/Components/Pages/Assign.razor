@@ -74,30 +74,20 @@ else
 
         <div class="col-md-7">
             <label class="form-label fw-semibold">Course</label>
-            <div class="position-relative mb-2">
-                <input class="form-control" placeholder="@(selectedStudent is null ? "Select a student first..." : "Show prerequisite chain needed for course...")"
-                       value="@targetCourseSearchText" disabled="@(selectedStudent is null)"
-                       @oninput="OnTargetCourseSearchInput" />
-                @if (selectedStudent is not null && TargetCourseSuggestions.Any())
-                {
-                    <ul class="list-group position-absolute w-100 shadow" style="z-index: 10;">
-                        @foreach (var c in TargetCourseSuggestions)
-                        {
-                            <li class="list-group-item list-group-item-action" style="cursor:pointer"
-                                @onclick="() => SelectTargetCourse(c)">
-                                @c.CourseNumber — @c.Name
-                            </li>
-                        }
-                    </ul>
-                }
-                @if (prerequisiteChainFilter is not null)
-                {
-                    <div class="form-text">
-                        Showing prerequisite chain for <strong>@targetCourseNumber</strong> (@prerequisiteChainFilter.Count course(s)).
-                        <button class="btn btn-link btn-sm p-0" @onclick="ClearTargetCourseFilter">Clear</button>
-                    </div>
-                }
+            <input class="form-control mb-1" placeholder="@(selectedStudent is null ? "Select a student first..." : "Search by course number or name...")"
+                   disabled="@(selectedStudent is null)"
+                   @bind="courseSearchText" @bind:event="oninput" />
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="includePrerequisites"
+                       disabled="@(selectedStudent is null)" @bind="includePrerequisites" />
+                <label class="form-check-label" for="includePrerequisites">Include prerequisites?</label>
             </div>
+            @if (selectedStudent is not null && !string.IsNullOrWhiteSpace(courseSearchText))
+            {
+                <div class="form-text mt-n2 mb-2">
+                    Showing @DisplayedCourses.Count() course(s) matching "@courseSearchText"@(includePrerequisites ? ", including prerequisites" : "").
+                </div>
+            }
 
             @if (selectedStudent is null)
             {
@@ -167,9 +157,8 @@ else
     private string studentSearchText = "";
     private StudentAssignmentProfile? selectedStudent;
 
-    private string targetCourseSearchText = "";
-    private string? targetCourseNumber;
-    private HashSet<string>? prerequisiteChainFilter;
+    private string courseSearchText = "";
+    private bool includePrerequisites = true;
 
     private int? selectedCourseId;
 
@@ -195,41 +184,53 @@ else
                     s.Id.ToString().Contains(studentSearchText))
                 .Take(8);
 
-    private IEnumerable<CourseListItem> TargetCourseSuggestions =>
-        string.IsNullOrWhiteSpace(targetCourseSearchText)
-            ? []
-            : (allCourses ?? [])
-                .Where(c =>
-                    c.CourseNumber.Contains(targetCourseSearchText, StringComparison.OrdinalIgnoreCase) ||
-                    c.Name.Contains(targetCourseSearchText, StringComparison.OrdinalIgnoreCase))
-                .Take(8);
-
+    /// <summary>
+    /// Courses matching <see cref="courseSearchText"/> by number or name, plus (when
+    /// <see cref="includePrerequisites"/> is set) everything in their prerequisite chains -
+    /// e.g. searching "TRNS-301" returns TRNS-301 itself, TRNS-201, and TRNS-101. Sorted
+    /// with not-yet-completed courses first (the more load-bearing signal - what can this
+    /// student actually take), then direct matches ahead of prerequisite-only rows, then
+    /// by course number.
+    /// </summary>
     private IEnumerable<CourseListItem> DisplayedCourses
     {
         get
         {
-            IEnumerable<CourseListItem> courses = allCourses ?? [];
+            var courses = allCourses ?? [];
+            var completed = selectedStudent is null
+                ? null
+                : new HashSet<string>(selectedStudent.CompletedCourseNumbers, StringComparer.OrdinalIgnoreCase);
 
-            if (prerequisiteChainFilter is not null)
+            if (string.IsNullOrWhiteSpace(courseSearchText))
             {
-                courses = courses.Where(c => prerequisiteChainFilter.Contains(c.CourseNumber));
+                return SortCourses(courses, matched: null, completed);
             }
 
-            if (selectedStudent is not null)
-            {
-                var completed = new HashSet<string>(selectedStudent.CompletedCourseNumbers, StringComparer.OrdinalIgnoreCase);
-                courses = courses
-                    .OrderBy(c => completed.Contains(c.CourseNumber) ? 1 : 0)
-                    .ThenBy(c => c.CourseNumber);
-            }
-            else
-            {
-                courses = courses.OrderBy(c => c.CourseNumber);
-            }
+            var directMatches = courses
+                .Where(c =>
+                    c.CourseNumber.Contains(courseSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(courseSearchText, StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.CourseNumber)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            return courses;
+            var included = includePrerequisites
+                ? CoursePrerequisiteResolver.GetTransitivePrerequisites(courses, directMatches)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            included.UnionWith(directMatches);
+
+            var filtered = courses.Where(c => included.Contains(c.CourseNumber));
+            return SortCourses(filtered, directMatches, completed);
         }
     }
+
+    private static IEnumerable<CourseListItem> SortCourses(
+        IEnumerable<CourseListItem> courses,
+        HashSet<string>? matched,
+        HashSet<string>? completed) =>
+        courses
+            .OrderBy(c => completed is not null && completed.Contains(c.CourseNumber) ? 1 : 0)
+            .ThenBy(c => matched is not null && !matched.Contains(c.CourseNumber) ? 1 : 0)
+            .ThenBy(c => c.CourseNumber);
 
     private void OnStudentSearchInput(ChangeEventArgs e)
     {
@@ -249,29 +250,8 @@ else
         selectedStudent = null;
         studentSearchText = "";
         selectedCourseId = null;
-        targetCourseSearchText = "";
-        targetCourseNumber = null;
-        prerequisiteChainFilter = null;
+        courseSearchText = "";
         assignmentMessage = null;
-    }
-
-    private void OnTargetCourseSearchInput(ChangeEventArgs e)
-    {
-        targetCourseSearchText = e.Value?.ToString() ?? "";
-    }
-
-    private void SelectTargetCourse(CourseListItem course)
-    {
-        targetCourseSearchText = $"{course.CourseNumber} — {course.Name}";
-        targetCourseNumber = course.CourseNumber;
-        prerequisiteChainFilter = CoursePrerequisiteResolver.GetTransitivePrerequisites(allCourses!, course.CourseNumber);
-    }
-
-    private void ClearTargetCourseFilter()
-    {
-        targetCourseSearchText = "";
-        targetCourseNumber = null;
-        prerequisiteChainFilter = null;
     }
 
     private async Task AssignAsync()
@@ -295,14 +275,12 @@ else
                 // Refresh so seat counts, credit load, and eligibility all reflect the new
                 // assignment - lets the registrar immediately continue to the next course
                 // in a chain (e.g. assign the unlocked course right after this one) for the
-                // same student without re-searching.
+                // same student without re-searching. DisplayedCourses is derived fresh from
+                // allCourses/courseSearchText on every render, so no separate filter state
+                // needs to be recomputed here.
                 allCourses = await CourseService.GetCoursesAsync();
                 selectedStudent = await StudentService.GetStudentProfileAsync(selectedStudent.Id);
                 selectedCourseId = null;
-                if (targetCourseNumber is not null)
-                {
-                    prerequisiteChainFilter = CoursePrerequisiteResolver.GetTransitivePrerequisites(allCourses, targetCourseNumber);
-                }
             }
             else
             {

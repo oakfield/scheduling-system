@@ -43,4 +43,22 @@ public static class CoursePrerequisiteResolver
 
         return result;
     }
+
+    /// <summary>
+    /// Union of <see cref="GetTransitivePrerequisites(IReadOnlyList{CourseListItem}, string)"/>
+    /// across several target courses at once - e.g. every prerequisite needed by any course
+    /// that matched a search term.
+    /// </summary>
+    public static HashSet<string> GetTransitivePrerequisites(
+        IReadOnlyList<CourseListItem> courses,
+        IEnumerable<string> targetCourseNumbers)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var targetCourseNumber in targetCourseNumbers)
+        {
+            result.UnionWith(GetTransitivePrerequisites(courses, targetCourseNumber));
+        }
+
+        return result;
+    }
 }
