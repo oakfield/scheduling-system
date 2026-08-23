@@ -18,6 +18,7 @@ var connectionString = builder.Configuration.GetConnectionString("SchedulingDb")
 builder.Services.AddDbContextFactory<SchedulingDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
 
 var app = builder.Build();
 

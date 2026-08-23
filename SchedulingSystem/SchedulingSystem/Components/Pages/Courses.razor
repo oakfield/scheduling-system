@@ -1,0 +1,104 @@
+@page "/courses"
+@rendermode InteractiveServer
+@using SchedulingSystem.Models
+@using SchedulingSystem.Services
+@inject ICourseService CourseService
+
+<PageTitle>Courses</PageTitle>
+
+<h1>Courses</h1>
+<p>Search and filter the course catalog. Filters combine (AND) across columns.</p>
+
+@if (courses is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Course</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Instructor</th>
+                    <th>Department</th>
+                    <th>Credits</th>
+                    <th>Available Seats</th>
+                    <th>Prerequisites</th>
+                </tr>
+                <tr>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="courseNumberFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="nameFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="descriptionFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="instructorFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="departmentFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="creditsFilter" @bind:event="oninput" /></th>
+                    <th><input class="form-control form-control-sm" placeholder="Filter..." @bind="availableSeatsFilter" @bind:event="oninput" /></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var course in FilteredCourses)
+                {
+                    <tr>
+                        <td>@course.CourseNumber</td>
+                        <td>@course.Name</td>
+                        <td>@course.Description</td>
+                        <td>@course.Instructor</td>
+                        <td>@course.Department</td>
+                        <td>@course.Credits</td>
+                        <td class="@(course.AvailableSeats <= 0 ? "text-danger fw-semibold" : null)">
+                            @course.AvailableSeats / @course.Capacity
+                        </td>
+                        <td>
+                            @if (course.PrerequisiteCourseNumbers.Count == 0)
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                            else
+                            {
+                                @string.Join(", ", course.PrerequisiteCourseNumbers)
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-muted">Showing @FilteredCourses.Count() of @courses.Count courses.</p>
+}
+
+@code {
+    private IReadOnlyList<CourseListItem>? courses;
+
+    private string courseNumberFilter = "";
+    private string nameFilter = "";
+    private string descriptionFilter = "";
+    private string instructorFilter = "";
+    private string departmentFilter = "";
+    private string creditsFilter = "";
+    private string availableSeatsFilter = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        courses = await CourseService.GetCoursesAsync();
+    }
+
+    private IEnumerable<CourseListItem> FilteredCourses => (courses ?? [])
+        .Where(c => Matches(c.CourseNumber, courseNumberFilter))
+        .Where(c => Matches(c.Name, nameFilter))
+        .Where(c => Matches(c.Description, descriptionFilter))
+        .Where(c => Matches(c.Instructor, instructorFilter))
+        .Where(c => Matches(c.Department, departmentFilter))
+        .Where(c => Matches(c.Credits, creditsFilter))
+        .Where(c => Matches(c.AvailableSeats, availableSeatsFilter));
+
+    private static bool Matches(string value, string filter) =>
+        string.IsNullOrWhiteSpace(filter) || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+    private static bool Matches(int value, string filter) =>
+        string.IsNullOrWhiteSpace(filter) || value.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase);
+}
