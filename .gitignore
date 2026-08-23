@@ -52,3 +52,7 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# ASP.NET Data Protection keys (local dev only; the container persists these to a
+# docker-compose volume instead)
+DataProtection-Keys/

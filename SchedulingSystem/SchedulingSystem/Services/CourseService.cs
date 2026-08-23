@@ -17,21 +17,6 @@ public class CourseService(IDbContextFactory<SchedulingDbContext> contextFactory
             .OrderBy(c => c.CourseNumber)
             .ToListAsync(cancellationToken);
 
-        return courses
-            .Select(c => new CourseListItem(
-                c.Id,
-                c.CourseNumber,
-                c.Name,
-                c.Description,
-                c.Instructor,
-                c.Department,
-                c.Credits,
-                c.Capacity,
-                c.Capacity - c.AssignedStudents.Count,
-                c.Prerequisites
-                    .Select(p => p.CourseNumber)
-                    .OrderBy(n => n)
-                    .ToList()))
-            .ToList();
+        return courses.Select(EntityMappings.ToListItem).ToList();
     }
 }

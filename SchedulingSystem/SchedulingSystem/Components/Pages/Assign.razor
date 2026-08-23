@@ -1,0 +1,317 @@
+@page "/"
+@rendermode InteractiveServer
+@using SchedulingSystem.Models
+@using SchedulingSystem.Services
+@inject IStudentService StudentService
+@inject ICourseService CourseService
+@inject IEnrollmentService EnrollmentService
+
+<PageTitle>Student Assignment</PageTitle>
+
+<h1>Student Assignment</h1>
+<p>Assign a student to an eligible course for the upcoming semester.</p>
+
+@if (allStudents is null || allCourses is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @if (assignmentMessage is not null)
+    {
+        <div class="alert @(assignmentSucceeded ? "alert-success" : "alert-danger") alert-dismissible">
+            @assignmentMessage
+            <button type="button" class="btn-close" @onclick="() => assignmentMessage = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-md-5">
+            <label class="form-label fw-semibold">Student</label>
+            <div class="position-relative">
+                <input class="form-control" placeholder="Search by name, email, or ID..."
+                       value="@studentSearchText" disabled="@(selectedStudent is not null)"
+                       @oninput="OnStudentSearchInput" />
+                @if (selectedStudent is null && StudentSuggestions.Any())
+                {
+                    <ul class="list-group position-absolute w-100 shadow" style="z-index: 10;">
+                        @foreach (var s in StudentSuggestions)
+                        {
+                            <li class="list-group-item list-group-item-action" style="cursor:pointer"
+                                @onclick="() => SelectStudentAsync(s)">
+                                @s.FullName <span class="text-muted">— @s.Email (Year @s.YearLevel)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+
+            @if (selectedStudent is not null)
+            {
+                <div class="card mt-2">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title mb-1">@selectedStudent.FullName</h5>
+                                <div class="text-muted small">@selectedStudent.Email &middot; Year @selectedStudent.YearLevel</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearStudent">Change</button>
+                        </div>
+                        <hr />
+                        <div class="small">
+                            <div>Current credits (this term already in progress): @selectedStudent.CurrentCredits</div>
+                            <div>Assigned so far for upcoming semester: @selectedStudent.AssignedCreditsThisTerm / @selectedStudent.MaxCreditsAllowed credits</div>
+                            <div>Completed courses: @(selectedStudent.CompletedCourseNumbers.Count == 0 ? "None" : string.Join(", ", selectedStudent.CompletedCourseNumbers))</div>
+                            @if (selectedStudent.AssignedCourseNumbers.Count > 0)
+                            {
+                                <div>Assigned this semester: @string.Join(", ", selectedStudent.AssignedCourseNumbers)</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-md-7">
+            <label class="form-label fw-semibold">Course</label>
+            <div class="position-relative mb-2">
+                <input class="form-control" placeholder="@(selectedStudent is null ? "Select a student first..." : "Show prerequisite chain needed for course...")"
+                       value="@targetCourseSearchText" disabled="@(selectedStudent is null)"
+                       @oninput="OnTargetCourseSearchInput" />
+                @if (selectedStudent is not null && TargetCourseSuggestions.Any())
+                {
+                    <ul class="list-group position-absolute w-100 shadow" style="z-index: 10;">
+                        @foreach (var c in TargetCourseSuggestions)
+                        {
+                            <li class="list-group-item list-group-item-action" style="cursor:pointer"
+                                @onclick="() => SelectTargetCourse(c)">
+                                @c.CourseNumber — @c.Name
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (prerequisiteChainFilter is not null)
+                {
+                    <div class="form-text">
+                        Showing prerequisite chain for <strong>@targetCourseNumber</strong> (@prerequisiteChainFilter.Count course(s)).
+                        <button class="btn btn-link btn-sm p-0" @onclick="ClearTargetCourseFilter">Clear</button>
+                    </div>
+                }
+            </div>
+
+            @if (selectedStudent is null)
+            {
+                <p class="text-muted fst-italic">Select a student to enable course selection.</p>
+            }
+            else
+            {
+                <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Course</th>
+                                <th>Name</th>
+                                <th>Credits</th>
+                                <th>Seats</th>
+                                <th>Prerequisites</th>
+                                <th>Eligibility</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var course in DisplayedCourses)
+                            {
+                                var eligibility = EnrollmentValidator.Evaluate(selectedStudent, course);
+                                var completed = selectedStudent.CompletedCourseNumbers.Contains(course.CourseNumber, StringComparer.OrdinalIgnoreCase);
+                                <tr class="@(completed ? "text-muted" : null)">
+                                    <td>
+                                        <input type="radio" class="form-check-input" name="courseSelection"
+                                               checked="@(selectedCourseId == course.Id)"
+                                               @onchange="() => selectedCourseId = course.Id" />
+                                    </td>
+                                    <td>@course.CourseNumber</td>
+                                    <td>@course.Name @(completed ? "(completed)" : "")</td>
+                                    <td>@course.Credits</td>
+                                    <td>@course.AvailableSeats / @course.Capacity</td>
+                                    <td>@(course.PrerequisiteCourseNumbers.Count == 0 ? "None" : string.Join(", ", course.PrerequisiteCourseNumbers))</td>
+                                    <td>
+                                        @if (eligibility.IsEligible)
+                                        {
+                                            <span class="badge text-bg-success">Eligible</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-danger" title="@string.Join(" ", eligibility.Reasons)">Not eligible</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button class="btn btn-primary" disabled="@(!CanAssign || isAssigning)" @onclick="AssignAsync">
+            @(isAssigning ? "Assigning..." : "Assign Student To Course")
+        </button>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<StudentListItem>? allStudents;
+    private IReadOnlyList<CourseListItem>? allCourses;
+
+    private string studentSearchText = "";
+    private StudentAssignmentProfile? selectedStudent;
+
+    private string targetCourseSearchText = "";
+    private string? targetCourseNumber;
+    private HashSet<string>? prerequisiteChainFilter;
+
+    private int? selectedCourseId;
+
+    private string? assignmentMessage;
+    private bool assignmentSucceeded;
+    private bool isAssigning;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allStudents = await StudentService.GetStudentsAsync();
+        allCourses = await CourseService.GetCoursesAsync();
+    }
+
+    private bool CanAssign => selectedStudent is not null && selectedCourseId is not null;
+
+    private IEnumerable<StudentListItem> StudentSuggestions =>
+        string.IsNullOrWhiteSpace(studentSearchText)
+            ? []
+            : (allStudents ?? [])
+                .Where(s =>
+                    s.FullName.Contains(studentSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    s.Email.Contains(studentSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    s.Id.ToString().Contains(studentSearchText))
+                .Take(8);
+
+    private IEnumerable<CourseListItem> TargetCourseSuggestions =>
+        string.IsNullOrWhiteSpace(targetCourseSearchText)
+            ? []
+            : (allCourses ?? [])
+                .Where(c =>
+                    c.CourseNumber.Contains(targetCourseSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(targetCourseSearchText, StringComparison.OrdinalIgnoreCase))
+                .Take(8);
+
+    private IEnumerable<CourseListItem> DisplayedCourses
+    {
+        get
+        {
+            IEnumerable<CourseListItem> courses = allCourses ?? [];
+
+            if (prerequisiteChainFilter is not null)
+            {
+                courses = courses.Where(c => prerequisiteChainFilter.Contains(c.CourseNumber));
+            }
+
+            if (selectedStudent is not null)
+            {
+                var completed = new HashSet<string>(selectedStudent.CompletedCourseNumbers, StringComparer.OrdinalIgnoreCase);
+                courses = courses
+                    .OrderBy(c => completed.Contains(c.CourseNumber) ? 1 : 0)
+                    .ThenBy(c => c.CourseNumber);
+            }
+            else
+            {
+                courses = courses.OrderBy(c => c.CourseNumber);
+            }
+
+            return courses;
+        }
+    }
+
+    private void OnStudentSearchInput(ChangeEventArgs e)
+    {
+        studentSearchText = e.Value?.ToString() ?? "";
+    }
+
+    private async Task SelectStudentAsync(StudentListItem student)
+    {
+        studentSearchText = student.FullName;
+        selectedCourseId = null;
+        assignmentMessage = null;
+        selectedStudent = await StudentService.GetStudentProfileAsync(student.Id);
+    }
+
+    private void ClearStudent()
+    {
+        selectedStudent = null;
+        studentSearchText = "";
+        selectedCourseId = null;
+        targetCourseSearchText = "";
+        targetCourseNumber = null;
+        prerequisiteChainFilter = null;
+        assignmentMessage = null;
+    }
+
+    private void OnTargetCourseSearchInput(ChangeEventArgs e)
+    {
+        targetCourseSearchText = e.Value?.ToString() ?? "";
+    }
+
+    private void SelectTargetCourse(CourseListItem course)
+    {
+        targetCourseSearchText = $"{course.CourseNumber} — {course.Name}";
+        targetCourseNumber = course.CourseNumber;
+        prerequisiteChainFilter = CoursePrerequisiteResolver.GetTransitivePrerequisites(allCourses!, course.CourseNumber);
+    }
+
+    private void ClearTargetCourseFilter()
+    {
+        targetCourseSearchText = "";
+        targetCourseNumber = null;
+        prerequisiteChainFilter = null;
+    }
+
+    private async Task AssignAsync()
+    {
+        if (selectedStudent is null || selectedCourseId is null)
+        {
+            return;
+        }
+
+        isAssigning = true;
+        try
+        {
+            var result = await EnrollmentService.AssignStudentToCourseAsync(selectedStudent.Id, selectedCourseId.Value);
+            assignmentSucceeded = result.Success;
+
+            if (result.Success)
+            {
+                var course = allCourses!.First(c => c.Id == selectedCourseId.Value);
+                assignmentMessage = $"Assigned {selectedStudent.FullName} to {course.CourseNumber} — {course.Name}.";
+
+                // Refresh so seat counts, credit load, and eligibility all reflect the new
+                // assignment - lets the registrar immediately continue to the next course
+                // in a chain (e.g. assign the unlocked course right after this one) for the
+                // same student without re-searching.
+                allCourses = await CourseService.GetCoursesAsync();
+                selectedStudent = await StudentService.GetStudentProfileAsync(selectedStudent.Id);
+                selectedCourseId = null;
+                if (targetCourseNumber is not null)
+                {
+                    prerequisiteChainFilter = CoursePrerequisiteResolver.GetTransitivePrerequisites(allCourses, targetCourseNumber);
+                }
+            }
+            else
+            {
+                assignmentMessage = string.Join(" ", result.Reasons);
+            }
+        }
+        finally
+        {
+            isAssigning = false;
+        }
+    }
+}

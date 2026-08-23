@@ -7,6 +7,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_HTTP_PORTS=8080
+
+# Created (as root, before dropping to the non-root user below) and pre-owned by
+# $APP_UID so that when docker-compose mounts an empty named volume here, Docker's
+# copy-in-on-first-mount behavior gives the volume these permissions instead of
+# defaulting the mount point to root, which the app couldn't then write to.
+RUN mkdir -p DataProtection-Keys && chown $APP_UID DataProtection-Keys
+
 USER $APP_UID
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS publish

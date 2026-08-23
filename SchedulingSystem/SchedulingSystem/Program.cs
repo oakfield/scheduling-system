@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using SchedulingSystem.Components;
 using SchedulingSystem.Data;
@@ -19,6 +20,16 @@ builder.Services.AddDbContextFactory<SchedulingDbContext>(options => options.Use
 
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
+builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+
+// Without this, keys live only in the container's writable layer: every container
+// recreate (a rebuild, a redeploy) invalidates every open browser tab's antiforgery
+// cookie, breaking their Blazor Server circuit until they reload. The docker-compose
+// volume below makes the directory survive recreation; the local dev folder does not
+// need to (see .gitignore) since a local process restart already loses in-memory state.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "DataProtection-Keys")))
+    .SetApplicationName("SchedulingSystem");
 
 var app = builder.Build();
 

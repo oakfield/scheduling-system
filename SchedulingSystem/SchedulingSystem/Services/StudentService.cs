@@ -17,20 +17,21 @@ public class StudentService(IDbContextFactory<SchedulingDbContext> contextFactor
             .ThenBy(s => s.FirstName)
             .ToListAsync(cancellationToken);
 
-        return students
-            .Select(s => new StudentListItem(
-                s.Id,
-                s.FirstName,
-                s.LastName,
-                s.Email,
-                s.HouseAffiliation,
-                s.YearLevel,
-                s.CurrentCredits,
-                s.MaxCreditsAllowed,
-                s.CompletedCourses
-                    .Select(c => c.CourseNumber)
-                    .OrderBy(c => c)
-                    .ToList()))
-            .ToList();
+        return students.Select(EntityMappings.ToListItem).ToList();
+    }
+
+    public async Task<StudentAssignmentProfile?> GetStudentProfileAsync(
+        int studentId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var student = await db.Students
+            .AsNoTracking()
+            .Include(s => s.CompletedCourses)
+            .Include(s => s.AssignedCourses)
+            .FirstOrDefaultAsync(s => s.Id == studentId, cancellationToken);
+
+        return student is null ? null : EntityMappings.ToAssignmentProfile(student);
     }
 }

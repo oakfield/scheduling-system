@@ -25,9 +25,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__SchedulingDb=Host=postgres;Port=5432;Database=scheduling;Username=scheduling_app;Password=scheduling_dev_password
+    volumes:
+      - dataprotection-keys:/app/DataProtection-Keys
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres-data:
+  dataprotection-keys:

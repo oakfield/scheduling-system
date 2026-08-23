@@ -10,4 +10,10 @@ public interface IStudentService
     /// it in memory rather than pushing filter criteria down to the database.
     /// </summary>
     Task<IReadOnlyList<StudentListItem>> GetStudentsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the given student's eligibility profile (completed courses, this term's
+    /// assignments, credit load), or null if no student has that id.
+    /// </summary>
+    Task<StudentAssignmentProfile?> GetStudentProfileAsync(int studentId, CancellationToken cancellationToken = default);
 }
