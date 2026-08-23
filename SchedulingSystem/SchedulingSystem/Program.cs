@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using SchedulingSystem.Components;
@@ -5,6 +6,15 @@ using SchedulingSystem.Data;
 using SchedulingSystem.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// `dotnet run` runs this app directly on the host, so unlike the containerized app (which
+// already sequences this via docker-compose.yml's depends_on/healthcheck) it still needs
+// its own Postgres brought up first. DOTNET_RUNNING_IN_CONTAINER is set by the official
+// .NET container base images, so this only runs for the host-run scenario.
+if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") != "true")
+{
+    EnsurePostgresContainerRunning(builder.Environment.ContentRootPath);
+}
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -58,3 +68,35 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+// Starts (or confirms) the Postgres container via docker-compose.yml at the repo root,
+// blocking until it reports healthy so the app never races its startup. Idempotent - a
+// no-op if the container is already running.
+static void EnsurePostgresContainerRunning(string contentRootPath)
+{
+    var repoRoot = Path.GetFullPath(Path.Combine(contentRootPath, "..", ".."));
+
+    Process process;
+    try
+    {
+        process = Process.Start(new ProcessStartInfo("docker", "compose up -d --wait postgres")
+        {
+            WorkingDirectory = repoRoot,
+            UseShellExecute = false,
+        }) ?? throw new InvalidOperationException("The docker process did not start.");
+    }
+    catch (Exception ex) when (ex is not InvalidOperationException)
+    {
+        throw new InvalidOperationException(
+            "Could not run 'docker compose up -d --wait postgres'. Is Docker Desktop installed and running?",
+            ex);
+    }
+
+    process.WaitForExit();
+    if (process.ExitCode != 0)
+    {
+        throw new InvalidOperationException(
+            $"'docker compose up -d --wait postgres' exited with code {process.ExitCode}. " +
+            "Make sure Docker Desktop is running, then try again.");
+    }
+}
