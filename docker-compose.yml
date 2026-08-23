@@ -1,4 +1,21 @@
 services:
+  # Dev-only credentials below — fine for a local/demo database, not for production use.
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=scheduling
+      - POSTGRES_USER=scheduling_app
+      - POSTGRES_PASSWORD=scheduling_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scheduling_app -d scheduling"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build:
       context: .
@@ -7,3 +24,10 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__SchedulingDb=Host=postgres;Port=5432;Database=scheduling;Username=scheduling_app;Password=scheduling_dev_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
